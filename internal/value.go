@@ -1,13 +1,14 @@
 package internal
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/couchbase/gocb/v2"
 )
 
 type Stretch struct {
-	ID          uint64            `json:"id"`
+	ID          string            `json:"id"`
 	Description string            `json:"description"`
 	Start       time.Time         `json:"start"`
 	End         *time.Time        `json:"end"`
@@ -15,11 +16,11 @@ type Stretch struct {
 	Attributes  map[string]string `json:"attrs"`
 }
 
-func GetID(collection *gocb.Collection) (uint64, error) {
+func GetID(collection *gocb.Collection) (string, error) {
 	id, err := collection.Binary().Increment("next-id", &gocb.IncrementOptions{Delta: 1})
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 
-	return id.Content(), nil
+	return strconv.FormatUint(id.Content(), 10), nil
 }

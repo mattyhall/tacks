@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
-	"strconv"
+	"os"
+	"os/signal"
 	"strings"
 	"time"
 
@@ -26,6 +28,9 @@ func parseAttrs(attrs []string) (map[string]string, error) {
 }
 
 func run(cmd *cobra.Command) error {
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+
 	err := validateConfig()
 	if err != nil {
 		return err
@@ -61,12 +66,29 @@ func run(cmd *cobra.Command) error {
 		Attributes:  realAttrs,
 	}
 
-	_, err = col.Insert(strconv.FormatUint(id, 10), &stretch, nil)
+	_, err = col.Insert(id, &stretch, nil)
 	if err != nil {
 		return fmt.Errorf("could not insert stretch: %w", err)
 	}
 
-	fmt.Printf("Recording stretch %d\n", id)
+	fmt.Printf("Recording stretch %s\n", id)
+
+	select {
+		case _ = <-ctx.Done():
+			break
+	}
+
+	now := time.Now()
+	stretch.End = &now
+
+	_, err = col.Upsert(id, &stretch, nil)
+	if err != nil {
+		fmt.Errorf("could not update stretch: %w", err)
+	}
+
+	dur := stretch.End.Sub(stretch.Start)
+
+	fmt.Printf("Comitted stretch %s of duration %s\n", id, dur)
 
 	return nil
 }
