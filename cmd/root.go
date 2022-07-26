@@ -40,6 +40,7 @@ func init() {
 
 func initConfig() {
 	viper.SetDefault("connection", "couchbase://localhost")
+	viper.SetDefault("scope", "tacks")
 
 	if cfgFile != "" {
 		viper.SetConfigFile(cfgFile)
@@ -47,6 +48,7 @@ func initConfig() {
 		home, err := os.UserHomeDir()
 		cobra.CheckErr(err)
 
+		viper.AddConfigPath(".")
 		viper.AddConfigPath(filepath.Join(home, ".config", "tacks"))
 		viper.SetConfigType("toml")
 		viper.SetConfigName("config")
@@ -115,13 +117,15 @@ func setupScopesAndConnections(bucket *gocb.Bucket, settingUp *bool) error {
 
 	var collections []gocb.CollectionSpec
 
-	i := slices.IndexFunc(scopes, func(s gocb.ScopeSpec) bool { return s.Name == "tacks" })
+	scopeName := viper.GetString("scope")
+
+	i := slices.IndexFunc(scopes, func(s gocb.ScopeSpec) bool { return s.Name == scopeName })
 	if i == -1 {
 		*settingUp = true
 		fmt.Println("Setting up database")
 
-		if err = cm.CreateScope("tacks", nil); err != nil {
-			return fmt.Errorf("could not create 'tacks' scope: %w", err)
+		if err = cm.CreateScope(scopeName, nil); err != nil {
+			return fmt.Errorf("could not create '%s' scope: %w", scopeName, err)
 		}
 	} else {
 		collections = scopes[i].Collections
@@ -134,7 +138,7 @@ func setupScopesAndConnections(bucket *gocb.Bucket, settingUp *bool) error {
 				fmt.Println("Setting up database")
 			}
 
-			err = cm.CreateCollection(gocb.CollectionSpec{ScopeName: "tacks", Name: collection}, nil)
+			err = cm.CreateCollection(gocb.CollectionSpec{ScopeName: scopeName, Name: collection}, nil)
 			if err != nil {
 				return fmt.Errorf("could not create collection: %w", err)
 			}
@@ -155,7 +159,7 @@ func setupSDK() (*gocb.Scope, error) {
 		return nil, err
 	}
 
-	scope := bucket.Scope("tacks")
+	scope := bucket.Scope(viper.GetString("scope"))
 
 	_, err = scope.Collection("internal").Binary().Increment("next-id", &gocb.IncrementOptions{Initial: 1})
 
