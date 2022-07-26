@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -21,17 +20,6 @@ var rootCmd = &cobra.Command{
 	Short:        "A time tracking application",
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		err := validateConfig()
-		if err != nil {
-			return err
-		}
-
-		scope, err := setupSDK()
-		if err != nil {
-			return err
-		}
-
-		_ = scope.Collection("stretch")
 
 		return nil
 	},
@@ -169,26 +157,7 @@ func setupSDK() (*gocb.Scope, error) {
 
 	scope := bucket.Scope("tacks")
 
-	col := scope.Collection("internal")
-
-	_, err = col.Get("next-id", nil)
-	if err == nil {
-		return scope, nil
-	}
-
-	if !errors.Is(err, gocb.ErrDocumentNotFound) {
-		return nil, fmt.Errorf("could not get next-id: %w", err)
-	}
-
-	if !settingUp {
-		settingUp = true
-		fmt.Println("Setting up database")
-	}
-
-	_, err = col.Insert("next-id", 1, nil)
-	if err != nil {
-		return nil, fmt.Errorf("could not insert next-id: %w", err)
-	}
+	_, err = scope.Collection("internal").Binary().Increment("next-id", &gocb.IncrementOptions{Initial: 1})
 
 	return scope, nil
 }
