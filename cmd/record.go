@@ -36,15 +36,13 @@ func run(cmd *cobra.Command) error {
 		return err
 	}
 
-	scope, err := setupSDK()
+	store, err := internal.NewStore()
 	if err != nil {
 		return err
 	}
 
-	internalCol := scope.Collection("internal")
-	col := scope.Collection("stretches")
 
-	id, err := internal.GetID(internalCol)
+	id, err := store.GetID()
 	if err != nil {
 		return fmt.Errorf("could not get id for stretch: %w", err)
 	}
@@ -66,9 +64,8 @@ func run(cmd *cobra.Command) error {
 		Attributes:  realAttrs,
 	}
 
-	_, err = col.Insert(id, &stretch, nil)
-	if err != nil {
-		return fmt.Errorf("could not insert stretch: %w", err)
+	if err = store.Insert(id, &stretch); err != nil {
+		return err
 	}
 
 	fmt.Printf("Recording stretch %s\n", id)
@@ -81,9 +78,9 @@ func run(cmd *cobra.Command) error {
 	now := time.Now()
 	stretch.End = &now
 
-	_, err = col.Upsert(id, &stretch, nil)
+	err = store.Upsert(id, &stretch)
 	if err != nil {
-		fmt.Errorf("could not update stretch: %w", err)
+		return err
 	}
 
 	dur := stretch.End.Sub(stretch.Start)
